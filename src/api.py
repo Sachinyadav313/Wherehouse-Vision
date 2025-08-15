@@ -10,10 +10,9 @@ app = FastAPI(title="Warehouse Safety Detection API")
 # --- CORS MIDDLEWARE ---
 # This allows your Vercel frontend to communicate with this backend.
 origins = [
-    "https://wherehouse-vision.vercel.app", # <-- Your live frontend URL
+    "https://wherehouse-vision.vercel.app", # Your live frontend URL
     "null",
 ]
-# -------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,10 +25,11 @@ app.add_middleware(
 
 # --- MODEL LOADING ---
 try:
-    model = YOLO("yolov8n.pt")
-    print(" Model loaded successfully.")
+    # This is the corrected line to load your custom model
+    model = YOLO("best.pt") 
+    print("✅ Model loaded successfully.")
 except Exception as e:
-    print(f" Error loading model: {e}")
+    print(f"❌ Error loading model: {e}")
     model = None
 # -------------------------
 
@@ -45,8 +45,8 @@ async def detect_objects(file: UploadFile = File(...)):
     contents = await file.read()
     img = Image.open(io.BytesIO(contents))
 
-    # Perform inference with a lower confidence threshold to ensure detections appear.
-    results = model(img, conf=0.10) # <-- THE KEY FIX IS HERE
+    # Perform inference with a lower confidence threshold
+    results = model(img, conf=0.10)
 
     detections = []
     for result in results:
