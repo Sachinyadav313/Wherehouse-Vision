@@ -18,6 +18,7 @@
         }
         h1 {
             color: #1a2b4d;
+            margin-bottom: 20px;
         }
         #video-container {
             position: relative;
@@ -40,6 +41,25 @@
             font-size: 1.5em;
             font-weight: bold;
         }
+        #details-container {
+            margin-top: 15px;
+            text-align: left;
+            border: 1px solid #ddd;
+            padding: 10px 20px;
+            border-radius: 8px;
+            min-width: 220px;
+            background-color: #fff;
+        }
+        #details-container p {
+            margin: 0 0 10px 0;
+            font-weight: bold;
+            color: #1a2b4d;
+        }
+        #details-container ul {
+            margin: 0;
+            padding-left: 20px;
+            list-style-type: square;
+        }
     </style>
 </head>
 <body>
@@ -49,20 +69,22 @@
         <canvas id="canvas" width="640" height="480"></canvas>
     </div>
     <div id="status">STATUS: INITIALIZING...</div>
+    <div id="details-container"></div>
 
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const context = canvas.getContext('2d');
         const statusDiv = document.getElementById('status');
+        const detailsContainer = document.getElementById('details-container');
         const API_URL = 'https://warehouse-vision.onrender.com/detect/';
+
         // 1. Access the webcam
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 video.srcObject = stream;
                 statusDiv.textContent = 'STATUS: RUNNING';
-                // Start sending frames for detection
-                setInterval(detectFrame, 200); // Send a frame every 200ms (5 FPS)
+                setInterval(detectFrame, 500); // Process 2 frames per second
             })
             .catch(err => {
                 console.error("Error accessing webcam: ", err);
@@ -72,30 +94,21 @@
 
         // 2. Function to capture a frame and send it to the API
         async function detectFrame() {
-            // Draw the current video frame onto the hidden canvas
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Convert the canvas image to a Blob (file format)
             canvas.toBlob(async (blob) => {
                 const formData = new FormData();
                 formData.append('file', blob, 'frame.jpg');
-
                 try {
-                    // Send the image to the FastAPI backend
                     const response = await fetch(API_URL, {
                         method: 'POST',
                         body: formData
                     });
-
                     if (!response.ok) {
                         console.error('API Error:', response.statusText);
                         return;
                     }
-
                     const data = await response.json();
-                    // Draw the results from the API onto the visible canvas
                     drawDetections(data.detections);
-
                 } catch (error) {
                     console.error('Fetch Error:', error);
                 }
@@ -104,45 +117,53 @@
 
         // 3. Function to draw the detections on the canvas
         function drawDetections(detections) {
-            // Clear the canvas before drawing new boxes
             context.clearRect(0, 0, canvas.width, canvas.height);
 
-            let isViolation = false;
             let headCount = 0;
             let helmetCount = 0;
+            let vestCount = 0;
 
             detections.forEach(det => {
                 const [x1, y1, x2, y2] = det.bounding_box;
                 const className = det.class_name;
                 const confidence = det.confidence;
 
-                // Count relevant objects
+                // Count specific objects from your custom model
                 if (className === 'head') headCount++;
-                if (className.includes('helmet')) helmetCount++;
+                if (className === 'helmet') helmetCount++;
+                if (className === 'vest') vestCount++;
 
-                // Set box color and style
-                context.strokeStyle = className.includes('helmet') ? 'lime' : 'red';
+                const color = className.includes('head') ? 'red' : 'lime';
+                context.strokeStyle = color;
                 context.lineWidth = 2;
                 context.font = '16px Arial';
-                context.fillStyle = context.strokeStyle;
+                context.fillStyle = color;
 
-                // Draw the bounding box
                 context.strokeRect(x1, y1, x2 - x1, y2 - y1);
                 
-                // Draw the label
                 const label = `${className} ${confidence.toFixed(2)}`;
                 context.fillText(label, x1, y1 > 20 ? y1 - 5 : y1 + 20);
             });
 
-            // Update the status display
-            isViolation = headCount > 0 && headCount > helmetCount;
+            // Update status based on violations (a head without proper gear)
+            const isViolation = headCount > 0 && (helmetCount < headCount || vestCount < headCount);
             if (isViolation) {
-                statusDiv.textContent = 'STATUS: VIOLATION DETECTED';
+                statusDiv.textContent = 'STATUS: VIOLATION';
                 statusDiv.style.color = 'red';
             } else {
                 statusDiv.textContent = 'STATUS: SAFE';
                 statusDiv.style.color = 'green';
             }
+
+            // Update the details container with the counts
+            detailsContainer.innerHTML = `
+                <p><b>OBJECTS DETECTED:</b></p>
+                <ul>
+                    <li>Persons: ${headCount}</li>
+                    <li>Helmets: ${helmetCount}</li>
+                    <li>Vests: ${vestCount}</li>
+                </ul>
+            `;
         }
     </script>
 </body>
