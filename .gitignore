@@ -1,0 +1,25 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE & Editor folders
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+*.swo
+*.swp
+
+# Docker
+.dockerignore
+#data
+ data

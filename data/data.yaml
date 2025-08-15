@@ -1,0 +1,10 @@
+# Paths relative to the data.yaml file itself
+train: train/images
+val: valid/images
+test: test/images
+
+# Number of classes
+nc: 5
+
+# Class names
+names: ['head', 'helmet', 'hi-viz helmet', 'hi-viz vest', 'person']

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Warehouse Safety Detection</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        h1 {
+            color: #1a2b4d;
+        }
+        #video-container {
+            position: relative;
+            border: 5px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background-color: #000;
+        }
+        video, canvas {
+            display: block;
+            border-radius: 5px;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Live Warehouse Safety Monitoring</h1>
+    <div id="video-container">
+        <video id="video" width="640" height="480" autoplay muted></video>
+        <canvas id="canvas" width="640" height="480"></canvas>
+    </div>
+    <div id="status">STATUS: INITIALIZING...</div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const context = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+        const API_URL = 'https://warehouse-vision.onrender.com/detect/';
+        // 1. Access the webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                statusDiv.textContent = 'STATUS: RUNNING';
+                // Start sending frames for detection
+                setInterval(detectFrame, 200); // Send a frame every 200ms (5 FPS)
+            })
+            .catch(err => {
+                console.error("Error accessing webcam: ", err);
+                statusDiv.textContent = 'ERROR: WEBCAM NOT ACCESSIBLE';
+                statusDiv.style.color = 'red';
+            });
+
+        // 2. Function to capture a frame and send it to the API
+        async function detectFrame() {
+            // Draw the current video frame onto the hidden canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Convert the canvas image to a Blob (file format)
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('file', blob, 'frame.jpg');
+
+                try {
+                    // Send the image to the FastAPI backend
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        console.error('API Error:', response.statusText);
+                        return;
+                    }
+
+                    const data = await response.json();
+                    // Draw the results from the API onto the visible canvas
+                    drawDetections(data.detections);
+
+                } catch (error) {
+                    console.error('Fetch Error:', error);
+                }
+            }, 'image/jpeg');
+        }
+
+        // 3. Function to draw the detections on the canvas
+        function drawDetections(detections) {
+            // Clear the canvas before drawing new boxes
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            let isViolation = false;
+            let headCount = 0;
+            let helmetCount = 0;
+
+            detections.forEach(det => {
+                const [x1, y1, x2, y2] = det.bounding_box;
+                const className = det.class_name;
+                const confidence = det.confidence;
+
+                // Count relevant objects
+                if (className === 'head') headCount++;
+                if (className.includes('helmet')) helmetCount++;
+
+                // Set box color and style
+                context.strokeStyle = className.includes('helmet') ? 'lime' : 'red';
+                context.lineWidth = 2;
+                context.font = '16px Arial';
+                context.fillStyle = context.strokeStyle;
+
+                // Draw the bounding box
+                context.strokeRect(x1, y1, x2 - x1, y2 - y1);
+                
+                // Draw the label
+                const label = `${className} ${confidence.toFixed(2)}`;
+                context.fillText(label, x1, y1 > 20 ? y1 - 5 : y1 + 20);
+            });
+
+            // Update the status display
+            isViolation = headCount > 0 && headCount > helmetCount;
+            if (isViolation) {
+                statusDiv.textContent = 'STATUS: VIOLATION DETECTED';
+                statusDiv.style.color = 'red';
+            } else {
+                statusDiv.textContent = 'STATUS: SAFE';
+                statusDiv.style.color = 'green';
+            }
+        }
+    </script>
+</body>
+</html>

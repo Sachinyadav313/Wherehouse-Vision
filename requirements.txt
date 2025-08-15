@@ -1,0 +1,11 @@
+# Core Web Framework
+fastapi
+uvicorn
+python-multipart
+
+# AI & Computer Vision
+ultralytics
+
+# Optional Audio Libraries
+gTTS
+playsound
