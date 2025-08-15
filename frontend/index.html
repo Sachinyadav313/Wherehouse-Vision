@@ -49,6 +49,7 @@
             border-radius: 8px;
             min-width: 220px;
             background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         #details-container p {
             margin: 0 0 10px 0;
@@ -84,7 +85,7 @@
             .then(stream => {
                 video.srcObject = stream;
                 statusDiv.textContent = 'STATUS: RUNNING';
-                setInterval(detectFrame, 500); // Process 2 frames per second
+                setInterval(detectFrame, 500); // Process 2 frames per second for better performance
             })
             .catch(err => {
                 console.error("Error accessing webcam: ", err);
@@ -96,6 +97,7 @@
         async function detectFrame() {
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             canvas.toBlob(async (blob) => {
+                if (!blob) return;
                 const formData = new FormData();
                 formData.append('file', blob, 'frame.jpg');
                 try {
