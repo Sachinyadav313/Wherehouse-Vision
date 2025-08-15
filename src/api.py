@@ -26,7 +26,7 @@ app.add_middleware(
 
 # --- MODEL LOADING ---
 try:
-    model = YOLO("best.pt")
+    model = YOLO("yolov8n.pt")
     print(" Model loaded successfully.")
 except Exception as e:
     print(f" Error loading model: {e}")
