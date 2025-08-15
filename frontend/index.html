@@ -79,13 +79,18 @@
         const statusDiv = document.getElementById('status');
         const detailsContainer = document.getElementById('details-container');
         const API_URL = 'https://warehouse-vision.onrender.com/detect/';
+        
+        // --- TEXT-TO-SPEECH SETUP ---
+        const synth = window.speechSynthesis;
+        let lastKnownStatus = 'SAFE'; // To prevent spamming the speech
+        // -----------------------------
 
         // 1. Access the webcam
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
                 video.srcObject = stream;
                 statusDiv.textContent = 'STATUS: RUNNING';
-                setInterval(detectFrame, 500); // Process 2 frames per second for better performance
+                setInterval(detectFrame, 500); // Process 2 frames per second
             })
             .catch(err => {
                 console.error("Error accessing webcam: ", err);
@@ -105,10 +110,7 @@
                         method: 'POST',
                         body: formData
                     });
-                    if (!response.ok) {
-                        console.error('API Error:', response.statusText);
-                        return;
-                    }
+                    if (!response.ok) { return; }
                     const data = await response.json();
                     drawDetections(data.detections);
                 } catch (error) {
@@ -117,7 +119,7 @@
             }, 'image/jpeg');
         }
 
-        // 3. Function to draw the detections on the canvas
+        // 3. Function to draw the detections and handle speech
         function drawDetections(detections) {
             context.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -130,7 +132,6 @@
                 const className = det.class_name;
                 const confidence = det.confidence;
 
-                // Count specific objects from your custom model
                 if (className === 'head') headCount++;
                 if (className === 'helmet') helmetCount++;
                 if (className === 'vest') vestCount++;
@@ -147,17 +148,24 @@
                 context.fillText(label, x1, y1 > 20 ? y1 - 5 : y1 + 20);
             });
 
-            // Update status based on violations (a head without proper gear)
+            // Determine current status
             const isViolation = headCount > 0 && (helmetCount < headCount || vestCount < headCount);
-            if (isViolation) {
-                statusDiv.textContent = 'STATUS: VIOLATION';
-                statusDiv.style.color = 'red';
-            } else {
-                statusDiv.textContent = 'STATUS: SAFE';
-                statusDiv.style.color = 'green';
-            }
+            const currentStatus = isViolation ? 'VIOLATION' : 'SAFE';
 
-            // Update the details container with the counts
+            // --- TEXT-TO-SPEECH LOGIC ---
+            // Speak only when the status changes to violation to avoid spam
+            if (currentStatus === 'VIOLATION' && lastKnownStatus !== 'VIOLATION') {
+                const utterance = new SpeechSynthesisUtterance("Violation Detected");
+                synth.speak(utterance);
+            }
+            lastKnownStatus = currentStatus; // Update the status for the next frame
+            // -----------------------------
+
+            // Update the visual display
+            statusDiv.textContent = `STATUS: ${currentStatus}`;
+            statusDiv.style.color = isViolation ? 'red' : 'green';
+            
+            // Update the details container
             detailsContainer.innerHTML = `
                 <p><b>OBJECTS DETECTED:</b></p>
                 <ul>
